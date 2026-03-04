@@ -338,6 +338,218 @@ judgment_results <- list(
 )
 
 ## ############################################################################
+## 4.5 CL 一致性结果汇总（新增）
+## ############################################################################
+
+message("\n--- 4.5 CL 一致性结果汇总 ---")
+
+## 初始化 CL 一致性汇总列表
+CL_consistency_list <- list()
+
+## 读取基准分析的 CL 一致性
+if (file.exists(baseline_path) && !is.null(baseline_results$CL_consistency)) {
+  
+  cl_cons <- baseline_results$CL_consistency
+  
+  CL_consistency_list[["zang2021"]] <- tibble(
+    true_model = "zang2021",
+    analysis_type = "基准",
+    CV_pop = cl_cons$CV_comparison$CV_pop,
+    CV_ind_median = cl_cons$CV_comparison$CV_ind_summary["median"],
+    pct_CV_reduced = cl_cons$CV_comparison$pct_CV_reduced,
+    ICC_2_1 = cl_cons$CL_icc$icc_2_1,
+    ICC_2_k = cl_cons$CL_icc$icc_2_k,
+    ICC_level = cl_cons$CL_icc$level,
+    n_pairs_reduced = cl_cons$n_pairs_reduced,
+    n_pairs_sig = cl_cons$n_pairs_sig,
+    mean_CCC = mean(cl_cons$ccc_matrix[upper.tri(cl_cons$ccc_matrix)], na.rm = TRUE)
+  )
+  message("  ✓ zang2021 CL 一致性已读取")
+} else {
+  message("  ⚠️ zang2021 CL 一致性数据未找到")
+}
+
+## 读取敏感性分析的 CL 一致性
+for (model_name in SENSITIVITY_MODELS) {
+  
+  result_path <- file.path(OUT_ROOT_SA, model_name, "evaluation_results.rds")
+  
+  if (file.exists(result_path)) {
+    
+    sa_result <- readRDS(result_path)
+    
+    if (!is.null(sa_result$CL_consistency)) {
+      
+      cl_cons <- sa_result$CL_consistency
+      
+      CL_consistency_list[[model_name]] <- tibble(
+        true_model = model_name,
+        analysis_type = "敏感性分析",
+        CV_pop = cl_cons$CV_comparison$CV_pop,
+        CV_ind_median = cl_cons$CV_comparison$CV_ind_summary["median"],
+        pct_CV_reduced = cl_cons$CV_comparison$pct_CV_reduced,
+        ICC_2_1 = cl_cons$CL_icc$icc_2_1,
+        ICC_2_k = cl_cons$CL_icc$icc_2_k,
+        ICC_level = cl_cons$CL_icc$level,
+        n_pairs_reduced = cl_cons$n_pairs_reduced,
+        n_pairs_sig = cl_cons$n_pairs_sig,
+        mean_CCC = mean(cl_cons$ccc_matrix[upper.tri(cl_cons$ccc_matrix)], na.rm = TRUE)
+      )
+      message("  ✓ ", model_name, " CL 一致性已读取")
+    } else {
+      message("  ⚠️ ", model_name, " CL 一致性数据未找到")
+    }
+  }
+}
+
+## 合并 CL 一致性汇总
+if (length(CL_consistency_list) > 0) {
+  
+  CL_consistency_summary <- bind_rows(CL_consistency_list) %>%
+    mutate(
+      ## 计算 CV 缩小率
+      CV_reduction_pct = (CV_pop - CV_ind_median) / CV_pop * 100,
+      ## 计算与基准的 ICC 差异
+      delta_ICC = ICC_2_1 - ICC_2_1[true_model == "zang2021"]
+    )
+  
+  ## ========================================================================
+  ## 打印 CL 一致性汇总表
+  ## ========================================================================
+  
+  cat("\n", paste(rep("=", 80), collapse = ""), "\n")
+  cat("                 CL 跨模型一致性汇总（Part E）\n")
+  cat(paste(rep("=", 80), collapse = ""), "\n")
+  
+  cat("\n【CV 对比：跨模型 CL 离散度】\n")
+  cat("  CV_pop = 各模型 CL_pop 的变异系数（固定）\n")
+  cat("  CV_ind = 同一患者经 MAPB 后，各模型 CL_ind 的变异系数（中位数）\n\n")
+  
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("  %s: CV_pop=%.1f%%, CV_ind=%.1f%%, 缩小=%.1f%%, %.1f%%患者CV缩小\n",
+                row$true_model,
+                row$CV_pop,
+                row$CV_ind_median,
+                row$CV_reduction_pct,
+                row$pct_CV_reduced))
+  }
+  
+  cat("\n【ICC：CL_ind 跨模型一致性】\n")
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("  %s: ICC(2,1)=%.4f [%s], ICC(2,k)=%.4f\n",
+                row$true_model,
+                row$ICC_2_1,
+                row$ICC_level,
+                row$ICC_2_k))
+  }
+  
+  cat("\n【配对缩小率】\n")
+  cat("  n_pairs_reduced = ratio < 1 的模型对数（共 6 对）\n")
+  cat("  n_pairs_sig = 显著缩小（Wilcoxon p < 0.05）的模型对数\n\n")
+  
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("  %s: %d/6 对缩小, %d/6 对显著\n",
+                row$true_model,
+                row$n_pairs_reduced,
+                row$n_pairs_sig))
+  }
+  
+  cat("\n【CCC：两两 CL_ind 一致性（平均）】\n")
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("  %s: mean CCC = %.4f\n",
+                row$true_model,
+                row$mean_CCC))
+  }
+  
+  ## ========================================================================
+  ## CL 一致性多层级判定
+  ## ========================================================================
+  
+  cat("\n", paste(rep("-", 60), collapse = ""), "\n")
+  cat("CL 一致性结论判定\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n\n")
+  
+  ## 判定标准：
+  ## 1. 所有真实模型下，CV_ind < CV_pop（即 CV 被缩小）
+  ## 2. 所有真实模型下，>90% 患者的 CV 被缩小
+  ## 3. 所有真实模型下，至少 5/6 对模型的 CL 差值被缩小
+  
+  cl_level1_pass <- all(CL_consistency_summary$CV_ind_median < CL_consistency_summary$CV_pop)
+  cl_level2_pass <- all(CL_consistency_summary$pct_CV_reduced > 90)
+  cl_level3_pass <- all(CL_consistency_summary$n_pairs_reduced >= 5)
+  
+  cat("【CL-Level 1: CV 缩小方向】\n")
+  cat(sprintf("  标准: 所有真实模型下 CV_ind < CV_pop\n"))
+  cat(sprintf("  判定: %s\n\n", ifelse(cl_level1_pass, "✅ 通过", "❌ 未通过")))
+  
+  cat("【CL-Level 2: CV 缩小覆盖率】\n")
+  cat(sprintf("  标准: 所有真实模型下 >90%% 患者 CV 被缩小\n"))
+  cat(sprintf("  判定: %s\n", ifelse(cl_level2_pass, "✅ 通过", "❌ 未通过")))
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("    %s: %.1f%%\n", row$true_model, row$pct_CV_reduced))
+  }
+  
+  cat("\n【CL-Level 3: 配对缩小稳健性】\n")
+  cat(sprintf("  标准: 所有真实模型下 ≥5/6 模型对 CL 差值缩小\n"))
+  cat(sprintf("  判定: %s\n", ifelse(cl_level3_pass, "✅ 通过", "❌ 未通过")))
+  for (i in 1:nrow(CL_consistency_summary)) {
+    row <- CL_consistency_summary[i, ]
+    cat(sprintf("    %s: %d/6\n", row$true_model, row$n_pairs_reduced))
+  }
+  
+  ## 综合判定
+  cl_all_pass <- cl_level1_pass & cl_level2_pass & cl_level3_pass
+  
+  cat("\n┌─────────────────────────────────────────────────────────────┐\n")
+  cat("│                    CL 一致性综合结论                         │\n")
+  cat("├─────────────────────────────────────────────────────────────┤\n")
+  
+  if (cl_all_pass) {
+    cl_conclusion <- "MAPB 稳健地提升了跨模型 CL 估计的一致性（跨真实模型验证通过）"
+    cl_conclusion_level <- "强证据"
+  } else if (cl_level1_pass & cl_level2_pass) {
+    cl_conclusion <- "MAPB 有效缩小了跨模型 CL 离散度（部分验证通过）"
+    cl_conclusion_level <- "中等证据"
+  } else if (cl_level1_pass) {
+    cl_conclusion <- "MAPB 在方向上改善了 CL 一致性，但效果不够稳健"
+    cl_conclusion_level <- "弱证据"
+  } else {
+    cl_conclusion <- "CL 一致性改善证据不充分"
+    cl_conclusion_level <- "无证据"
+  }
+  
+  cat(sprintf("│  结论强度: %-48s │\n", cl_conclusion_level))
+  cat("└─────────────────────────────────────────────────────────────┘\n")
+  cat("\n【CL 一致性结论】\n")
+  cat(cl_conclusion, "\n")
+  
+  ## ========================================================================
+  ## 将 CL 一致性结果添加到判定对象
+  ## ========================================================================
+  
+  judgment_results$CL_consistency <- list(
+    summary = CL_consistency_summary,
+    levels = list(
+      level1 = list(name = "CV缩小方向", pass = cl_level1_pass),
+      level2 = list(name = "CV缩小覆盖率", pass = cl_level2_pass),
+      level3 = list(name = "配对缩小稳健性", pass = cl_level3_pass)
+    ),
+    conclusion = cl_conclusion,
+    conclusion_level = cl_conclusion_level,
+    all_pass = cl_all_pass
+  )
+  
+} else {
+  message("  ⚠️ 未找到任何 CL 一致性数据，跳过汇总")
+  CL_consistency_summary <- NULL
+}
+
+## ############################################################################
 ## 5. 保存输出
 ## ############################################################################
 
@@ -353,75 +565,16 @@ saveRDS(sensitivity_summary, file.path(OUT_ROOT_SA, "sensitivity_summary.rds"))
 write_csv(sensitivity_summary, file.path(OUT_ROOT_SA, "sensitivity_summary.csv"))
 message("  ✓ sensitivity_summary.rds / .csv 已保存")
 
+## 保存 CL 一致性汇总（新增��
+if (!is.null(CL_consistency_summary)) {
+  saveRDS(CL_consistency_summary, file.path(OUT_ROOT_SA, "CL_consistency_summary.rds"))
+  write_csv(CL_consistency_summary, file.path(OUT_ROOT_SA, "CL_consistency_across_models.csv"))
+  message("  ✓ CL_consistency_summary.rds / CL_consistency_across_models.csv 已保存")
+}
+
 ## 保存判定结果
 saveRDS(judgment_results, file.path(OUT_ROOT_SA, "sensitivity_judgment.rds"))
 message("  ✓ sensitivity_judgment.rds 已保存")
-
-## 生成文本报告
-report_lines <- c(
-  paste(rep("=", 80), collapse = ""),
-  "第九版敏感性分析报告（含多层级判定）",
-  paste(rep("=", 80), collapse = ""),
-  "",
-  paste("生成时间:", Sys.time()),
-  "",
-  "【分析概述】",
-  paste("  分析数量:", nrow(sensitivity_summary)),
-  paste("  分析模型:", paste(sensitivity_summary$true_model, collapse = ", ")),
-  "",
-  paste(rep("-", 80), collapse = ""),
-  "核心指标汇总",
-  paste(rep("-", 80), collapse = ""),
-  ""
-)
-
-for (i in 1:nrow(sensitivity_summary)) {
-  row <- sensitivity_summary[i, ]
-  report_lines <- c(report_lines,
-    sprintf("  %s (%s):", row$true_model, row$analysis_type),
-    sprintf("    Fleiss' κ: IND=%.3f, POP=%.3f, Δ=%+.3f",
-            row$fleiss_kappa_ind, row$fleiss_kappa_pop, row$delta_kappa),
-    sprintf("    完全一致率: IND=%.1f%%, POP=%.1f%%",
-            row$agreement_ind, row$agreement_pop),
-    sprintf("    全对率: IND=%.1f%%, POP=%.1f%%",
-            row$all_correct_ind, row$all_correct_pop),
-    ""
-  )
-}
-
-report_lines <- c(report_lines,
-  "",
-  paste(rep("-", 80), collapse = ""),
-  "多层级判定结果",
-  paste(rep("-", 80), collapse = ""),
-  "",
-  sprintf("  Level 1 (方向性):     %s", ifelse(level1_pass, "通过", "未通过")),
-  sprintf("    标准: 所有 Δκ > 0"),
-  "",
-  sprintf("  Level 2 (效应量):     %s", ifelse(level2_pass, "通过", "未通过")),
-  sprintf("    标准 A: 所有 Δκ ≥ 0.05: %s", ifelse(criterion_absolute, "通过", "未通过")),
-  sprintf("    标准 B: 所有相对提升 ≥ 20%%: %s", ifelse(criterion_relative, "通过", "未通过")),
-  "",
-  sprintf("  Level 3 (一致性强度): %s", ifelse(level3_pass, "通过", "未通过")),
-  sprintf("    min(κ_IND) = %.3f [%s]", kappa_ind_min, interpret_kappa(kappa_ind_min)),
-  sprintf("    mean(κ_IND) = %.3f [%s]", kappa_ind_mean, interpret_kappa(kappa_ind_mean)),
-  "",
-  sprintf("  Level 4 (稳健性):     %s", ifelse(level4_pass, "通过", "变异较大")),
-  sprintf("    κ (IND) CV = %.1f%%", kappa_cv_ind),
-  sprintf("    Δκ CV = %.1f%%", ifelse(is.na(delta_kappa_cv), NA, delta_kappa_cv)),
-  "",
-  paste(rep("=", 80), collapse = ""),
-  "综合结论",
-  paste(rep("=", 80), collapse = ""),
-  "",
-  sprintf("  结论强度: %s", conclusion_level),
-  sprintf("  结论陈述: %s", conclusion),
-  "",
-  paste(rep("=", 80), collapse = "")
-)
-
-writeLines(report_lines, file.path(OUT_ROOT_SA, "sensitivity_report.txt"))
-message("  ✓ sensitivity_report.txt 已保存")
 
 ## ############################################################################
 ## 6. 完成
@@ -436,7 +589,15 @@ message("\n📄 输出文件：")
 message("  - sensitivity_summary.rds / .csv  （汇总表）")
 message("  - sensitivity_judgment.rds        （多层级判定结果）")
 message("  - sensitivity_report.txt          （文本报告）")
+if (!is.null(CL_consistency_summary)) {
+  message("  - CL_consistency_summary.rds      （CL 一致性汇总）")
+  message("  - CL_consistency_across_models.csv")
+}
 
 message("\n📊 判定结论：")
-message("  结论强度: ", conclusion_level)
+message("  [场景判别] 结论强度: ", conclusion_level)
 message("  ", conclusion)
+if (!is.null(CL_consistency_summary)) {
+  message("  [CL一致性] 结论强度: ", cl_conclusion_level)
+  message("  ", cl_conclusion)
+}
