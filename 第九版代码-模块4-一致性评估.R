@@ -1092,4 +1092,7 @@ cat("\n=== 对比：两两一致 vs 两两都正确 (IND) ===\n")
 cat("两两一致（对角线外平均）:", 
     round(mean(pairwise_agree_ind[upper.tri(pairwise_agree_ind)]), 1), "%\n")
 cat("两两都正确（对角线外平均）:", 
+
     round(mean(pairwise_both_correct_ind[upper.tri(pairwise_both_correct_ind)]), 1), "%\n")
+
+source("第九版代码-模块4E-CL一致性分析.R")
