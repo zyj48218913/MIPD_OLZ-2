@@ -275,7 +275,7 @@ run_mapb_maharaj <- function(C_obs, ev_df, iCov, omega_calibrate,
     -(ll + lp)
   }
   
-  ## L-BFGS-B 优化，边界约束 η ∈ [-3, 3]
+  ## 
   opt <- robust_optim(obj_fun, par_init = 0, lower = -3, upper = 3)
   
   list(
@@ -319,8 +319,8 @@ run_mapb_zang <- function(C_obs, ev_df, iCov, omega_calibrate,
     -(ll + lp)
   }
   
-  ## L-BFGS-B 优化
-  opt <- robust_optim(obj_fun, par_init = 0, lower = -3, upper = 3)
+   ##
+    opt <- robust_optim(obj_fun, par_init = c(0, 0), lower = c(-3, -3), upper = c(3, 3))
   
   list(
     eta_ind = c(eta_CL = opt$par[1], eta_V = opt$par[2]),
@@ -360,7 +360,7 @@ run_mapb_li2018 <- function(C_obs, ev_df, iCov, omega_calibrate,
     -(ll + lp)
   }
   
-  opt <- robust_optim(obj_fun, par_init = 0, lower = -3, upper = 3)
+    opt <- robust_optim(obj_fun, par_init = c(0, 0), lower = c(-3, -3), upper = c(3, 3))
   
   list(
     eta_ind = c(eta_CL = opt$par[1], eta_Vc = opt$par[2]),
@@ -400,7 +400,7 @@ run_mapb_yin2016 <- function(C_obs, ev_df, iCov, omega_calibrate,
     -(ll + lp)
   }
   
-  opt <- robust_optim(obj_fun, par_init = 0, lower = -3, upper = 3)
+    opt <- robust_optim(obj_fun, par_init = c(0, 0), lower = c(-3, -3), upper = c(3, 3))
   
   list(
     eta_ind = c(eta_CL = opt$par[1], eta_V2 = opt$par[2]),
@@ -441,7 +441,7 @@ run_mapb_sun2021 <- function(C_obs, ev_df, iCov, omega_calibrate,
     -(ll + lp)
   }
   
-  opt <- robust_optim(obj_fun, par_init = 0, lower = -3, upper = 3)
+    opt <- robust_optim(obj_fun, par_init = c(0, 0), lower = c(-3, -3), upper = c(3, 3))
   
   list(
     eta_ind = c(eta_CL = opt$par[1], eta_Vc = opt$par[2]),
