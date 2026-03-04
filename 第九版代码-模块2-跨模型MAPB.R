@@ -440,8 +440,8 @@ run_mapb_yin <- function(C_obs, ev_df, iCov, omega_CL,
     -(ll + lp)
   }
   
-  opt <- robust_optim(obj_fun, par_init = c(0, 0),
-                      lower = c(-3, -3), upper = c(3, 3))
+    opt <- robust_optim(obj_fun, par_init = 0,
+                      lower = -3, upper = 3)
   
   list(
     eta_CL_ind = opt$par,
@@ -484,8 +484,8 @@ run_mapb_sun <- function(C_obs, ev_df, iCov, omega_CL,
     -(ll + lp)
   }
   
-  opt <- robust_optim(obj_fun, par_init = c(0, 0),
-                      lower = c(-3, -3), upper = c(3, 3))
+    opt <- robust_optim(obj_fun, par_init = 0,
+                      lower = -3, upper = 3)
   
   list(
     eta_CL_ind = opt$par,
